@@ -24,11 +24,13 @@ from gettext import gettext as _
 from gi.repository import GObject
 from gi.repository import Gtk
 from gi.repository import Gdk
+from gi.repository import Gio
 from gi.repository import Pango
 from gi.repository import WebKit
 from gi.repository import Soup
 from gi.repository import GConf
 
+from sugar3 import profile
 from sugar3 import env
 from sugar3.activity import activity
 from sugar3.graphics import style
@@ -65,6 +67,8 @@ DEFAULT_ERROR_PAGE = os.path.join(activity.get_bundle_path(),
 
 HOME_PAGE_GCONF_KEY = '/desktop/sugar/browser/home_page'
 
+# TODO: set to globally accessible URL once set-up is done
+HOME_PAGE_URI = 'http://54.187.40.150'
 
 class CommandListener(object):
     def __init__(self, window):
@@ -342,20 +346,13 @@ class TabbedView(BrowserNotebook):
         else:
             first_label.show_close_button()
 
-    def load_homepage(self, ignore_gconf=False):
+    def load_homepage(self):
         browser = self.current_browser
-        uri_homepage = None
-        if not ignore_gconf:
-            client = GConf.Client.get_default()
-            uri_homepage = client.get_string(HOME_PAGE_GCONF_KEY)
-        if uri_homepage is not None:
-            browser.load_uri(uri_homepage)
-        elif os.path.isfile(LIBRARY_PATH):
-            browser.load_uri('file://' + LIBRARY_PATH)
-        else:
-            default_page = os.path.join(activity.get_bundle_path(),
-                                        "data/index.html")
-            browser.load_uri('file://' + default_page)
+        settings = Gio.Settings('org.sugarlabs.collaboration')
+        home_page = settings.get_string('social-help-server')
+        if not home_page:
+            home_page = HOME_PAGE_URI
+        browser.load_uri(home_page)
         browser.grab_focus()
 
     def set_homepage(self):

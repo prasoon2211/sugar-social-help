@@ -26,7 +26,6 @@ GObject.threads_init()
 
 from gi.repository import Gtk
 from gi.repository import Gdk
-from gi.repository import GdkPixbuf
 from gi.repository import WebKit
 from gi.repository import Soup
 from gi.repository import SoupGNOME
@@ -34,10 +33,8 @@ from gi.repository import SoupGNOME
 import base64
 import time
 import shutil
-import sqlite3
 import json
 from gi.repository import GConf
-import locale
 import cairo
 import StringIO
 from hashlib import sha1
@@ -57,6 +54,9 @@ from sugar3 import mime
 from sugar3.graphics.toolbarbox import ToolbarButton
 
 PROFILE_VERSION = 2
+
+# TODO: set to globally accessible URL once set-up is done
+FORUM_URL = "http://54.187.40.150/"
 
 _profile_version = 0
 _profile_path = os.path.join(activity.get_activity_root(), 'data/gecko')
@@ -184,8 +184,6 @@ class SocialActivity(activity.Activity):
         self._edit_toolbar = EditToolbar(self)
         self._view_toolbar = ViewToolbar(self)
 
-        self._primary_toolbar.connect('add-link', self._link_add_button_cb)
-
         self._primary_toolbar.connect('go-home', self._go_home_button_cb)
 
         self._primary_toolbar.connect('go-library', self._go_library_button_cb)
@@ -214,18 +212,12 @@ class SocialActivity(activity.Activity):
         self._tabbed_view.show()
 
         self.model = Model()
-        self.model.connect('add_link', self._add_link_model_cb)
 
         self.connect('key-press-event', self._key_press_cb)
 
-        print handle.uri
-        print handle.__dict__
-
         if handle.uri:
             self._tabbed_view.current_browser.load_uri(handle.uri)
-        elif not self._jobject.file_path:
-            # TODO: we need this hack until we extend the activity API for
-            # opening URIs and default docs.
+        else:
             self._tabbed_view.load_homepage()
 
         self.messenger = None
@@ -479,9 +471,6 @@ class SocialActivity(activity.Activity):
             finally:
                 f.close()
 
-    def _link_add_button_cb(self, button):
-        self._add_link()
-
     def _go_home_button_cb(self, button):
         self._tabbed_view.load_homepage()
 
@@ -512,10 +501,7 @@ class SocialActivity(activity.Activity):
         browser = self._tabbed_view.props.current_browser
 
         if event.get_state() & Gdk.ModifierType.CONTROL_MASK:
-
-            if key_name == 'd':
-                self._add_link()
-            elif key_name == 'f':
+            if key_name == 'f':
                 _logger.debug('keyboard: Find')
                 self._edit_toolbar_button.set_expanded(True)
                 self._edit_toolbar.search_entry.grab_focus()
@@ -576,61 +562,6 @@ class SocialActivity(activity.Activity):
                 browser.stop_loading()
 
         return False
-
-    def _add_link(self):
-        ''' take screenshot and add link info to the model '''
-
-        browser = self._tabbed_view.props.current_browser
-        ui_uri = browser.get_uri()
-
-        for link in self.model.data['shared_links']:
-            if link['hash'] == sha1(ui_uri).hexdigest():
-                _logger.debug('_add_link: link exist already a=%s b=%s',
-                              link['hash'], sha1(ui_uri).hexdigest())
-                return
-        buf = self._get_screenshot()
-        timestamp = time.time()
-        self.model.add_link(ui_uri, browser.props.title, buf,
-                            profile.get_nick_name(),
-                            profile.get_color().to_string(), timestamp)
-
-        if self.messenger is not None:
-            self.messenger._add_link(ui_uri, browser.props.title,
-                                     profile.get_color().to_string(),
-                                     profile.get_nick_name(),
-                                     base64.b64encode(buf), timestamp)
-
-    def _add_link_model_cb(self, model, index):
-        ''' receive index of new link from the model '''
-        link = self.model.data['shared_links'][index]
-        self._add_link_totray(link['url'], base64.b64decode(link['thumb']),
-                              link['color'], link['title'],
-                              link['owner'], index, link['hash'])
-
-    def _add_link_totray(self, url, buf, color, title, owner, index, hash):
-        ''' add a link to the tray '''
-        item = LinkButton(buf, color, title, owner, hash)
-        item.connect('clicked', self._link_clicked_cb, url)
-        item.connect('remove_link', self._link_removed_cb)
-        # use index to add to the tray
-        self._tray.add_item(item, index)
-        item.show()
-        self._view_toolbar.traybutton.props.sensitive = True
-        self._view_toolbar.traybutton.props.active = True
-        self._view_toolbar.update_traybutton_tooltip()
-
-    def _link_removed_cb(self, button, hash):
-        ''' remove a link from tray and delete it in the model '''
-        self.model.remove_link(hash)
-        self._tray.remove_item(button)
-        if len(self._tray.get_children()) == 0:
-            self._view_toolbar.traybutton.props.sensitive = False
-            self._view_toolbar.traybutton.props.active = False
-            self._view_toolbar.update_traybutton_tooltip()
-
-    def _link_clicked_cb(self, button, url):
-        ''' an item of the link tray has been clicked '''
-        self._tabbed_view.props.current_browser.load_uri(url)
 
     def _get_screenshot(self):
         browser = self._tabbed_view.props.current_browser

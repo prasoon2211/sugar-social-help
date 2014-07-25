@@ -276,10 +276,7 @@ class PrimaryToolbar(ToolbarBase):
     __gtype_name__ = 'PrimaryToolbar'
 
     __gsignals__ = {
-        'add-link': (GObject.SignalFlags.RUN_FIRST,
-                     None,
-                     ([])),
-        'go-home': (GObject.SignalFlags.RUN_FIRST,
+       'go-home': (GObject.SignalFlags.RUN_FIRST,
                      None,
                      ([])),
         'set-home': (GObject.SignalFlags.RUN_FIRST,
@@ -386,12 +383,6 @@ class PrimaryToolbar(ToolbarBase):
         palette.set_content(self._forward_box_menu)
         # FIXME, this is a hack, should be done in the theme:
         palette._content.set_border_width(1)
-
-        self._link_add = ToolButton('emblem-favorite')
-        self._link_add.set_tooltip(_('Bookmark'))
-        self._link_add.connect('clicked', self._link_add_clicked_cb)
-        toolbar.insert(self._link_add, -1)
-        self._link_add.show()
 
         self._toolbar_separator = Gtk.SeparatorToolItem()
         self._toolbar_separator.props.draw = False
@@ -581,7 +572,6 @@ class PrimaryToolbar(ToolbarBase):
         self._forward.props.sensitive = can_go_forward
 
         is_webkit_browser = isinstance(self._browser, Browser)
-        self._link_add.props.sensitive = is_webkit_browser
         self._go_home.props.sensitive = is_webkit_browser
         if is_webkit_browser:
             self._reload_session_history()
@@ -687,6 +677,3 @@ class PrimaryToolbar(ToolbarBase):
         self._back.get_palette().popdown(immediate=True)
         self._forward.get_palette().popdown(immediate=True)
         self._browser.set_history_index(index)
-
-    def _link_add_clicked_cb(self, button):
-        self.emit('add-link')
